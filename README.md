@@ -53,7 +53,6 @@ fn main() {
     _ = sched.delete_task(43);
 
     // get scheduled job meta info from scheduler
-
     match sched.get_scheduled_job(/*key*/ 8) {
         Some(job) => {
             println!("[+] Next run at tick: {}", &job.next_runtime);
