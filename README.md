@@ -26,9 +26,9 @@ impl quartz_sched::Job for Box<MyTask> {
 
 fn main() {
     let mut sched: quartz_sched::Scheduler = quartz_sched::Scheduler::new();
-    
+
     // start the scheduler
-    // spawns execution and feeder threads  
+    // spawns execution and feeder threads
     sched.start();
 
     // execute after duration N
@@ -49,12 +49,25 @@ fn main() {
         )),
     ));
 
+    // delete task associated with key from scheduler
+    _ = sched.delete_task(43);
+
+    // get scheduled job meta info from scheduler
+
+    match sched.get_scheduled_job(/*key*/ 8) {
+        Some(job) => {
+            println!("[+] Next run at tick: {}", &job.next_runtime);
+        }
+        None => {}
+    };
+
     thread::sleep(Duration::from_secs(20));
-    
+
     // scheduler will stop after getting dropped
-    // alternatively, call sched.stop() to stop 
+    // alternatively, call sched.stop() to stop
     // the scheduler.
 }
+
 ```
 
 #### Status
