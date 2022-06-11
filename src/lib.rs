@@ -7,6 +7,7 @@ use crossbeam::{
 };
 use priority_queue::DoublePriorityQueue;
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     fmt,
     hash::{Hash, Hasher},
@@ -54,6 +55,13 @@ pub struct Task {
     pub job: Arc<dyn Job>,
     pub trigger: Box<dyn Trigger>,
     priority: i64,
+    key: i64,
+}
+
+pub struct ScheduledJob {
+    pub job: Arc<dyn Job>,
+    pub trigger_description: String,
+    pub next_runtime: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +75,14 @@ impl PartialEq for Task {
     }
 }
 
+impl PartialEq for ScheduledJob {
+    fn eq(&self, other: &Self) -> bool {
+        self.job.key() == other.job.key()
+    }
+}
+
 impl Eq for Task {}
+impl Eq for ScheduledJob {}
 
 impl SimpleCallbackJob {
     pub fn new(
@@ -85,8 +100,13 @@ impl SimpleCallbackJob {
 
 impl Hash for Task {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.job.description().hash(state);
-        self.trigger.description().hash(state);
+        self.job.key().hash(state);
+    }
+}
+
+impl Hash for ScheduledJob {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.job.key().hash(state);
     }
 }
 
@@ -120,6 +140,17 @@ impl fmt::Display for TriggerError {
     }
 }
 
+impl fmt::Debug for ScheduledJob {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ScheduledJob{{next_runtime: {}, job_description: {}}}",
+            self.next_runtime,
+            self.job.description()
+        )
+    }
+}
+
 impl Trigger for SimpleOnceTrigger {
     fn next_fire_time(&self) -> Result<i64, TriggerError> {
         if *self.expired.borrow() {
@@ -147,6 +178,12 @@ impl SimpleOnceTrigger {
 impl Drop for Scheduler {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+impl Borrow<i64> for Box<Task> {
+    fn borrow(&self) -> &i64 {
+        &self.key
     }
 }
 
@@ -194,12 +231,7 @@ impl Scheduler {
 
     pub fn schedule_task(&self, task: Box<Task>) {
         let _lock = self.lock.lock().unwrap();
-        self.feeder.0.send(task);
-    }
-
-    fn get_queue_len(&self) -> usize {
-        let queue = self.queue.lock().unwrap();
-        queue.len()
+        _ = self.feeder.0.send(task);
     }
 
     pub fn clear(&self) {
@@ -213,7 +245,7 @@ impl Scheduler {
         let interrupt_tx = self.interrupt.0.clone();
         let exit_rx = self.exit.1.clone();
         let queue = self.queue.clone();
-	
+
         thread::spawn(move || loop {
             select! {
                 recv(feeder_rx) -> msg => {
@@ -222,7 +254,7 @@ impl Scheduler {
 			    log::debug!("[+] Writing task to queue");
 			    let priority = *&value.priority;
 			    queue.lock().unwrap().push(value, priority);
-			    interrupt_tx.clone().send(true);
+			    _ = interrupt_tx.clone().send(true);
 			},
 			Err(err) => {
 			    panic!("{}", err);
@@ -278,13 +310,37 @@ impl Scheduler {
             }
         });
     }
+
+    pub fn get_scheduled_job(&self, key: i64) -> Option<ScheduledJob> {
+        let _queue = self.queue.lock().unwrap();
+
+        for (task, priority) in _queue.iter() {
+            if task.job.key() == key {
+                return Some(ScheduledJob {
+                    job: task.job.clone(),
+                    trigger_description: task.trigger.description(),
+                    next_runtime: *priority,
+                });
+            }
+        }
+
+        None
+    }
+
+    pub fn delete_task(&self, key: i64) -> bool {
+        let mut _queue = self.queue.lock().unwrap();
+        match _queue.remove(&key) {
+            Some(_) => true,
+            None => false,
+        }
+    }
 }
 
 fn calculate_next_tick(target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>) -> i64 {
     let mut interval: i64 = 0;
-    let queue = target_queue.lock().unwrap();
-    if !queue.is_empty() {
-        interval = park_time(*queue.peek_min().unwrap().1);
+    let _queue = target_queue.lock().unwrap();
+    if !_queue.is_empty() {
+        interval = park_time(*_queue.peek_min().unwrap().1);
         log::debug!("[+] Next tick: {}", &interval);
     }
 
@@ -311,7 +367,7 @@ fn execute_and_reschedule(
         job_handle.execute();
     });
     if task.priority > 0 {
-        target_chan.send(task);
+        _ = target_chan.send(task);
     }
 }
 
@@ -333,6 +389,7 @@ pub fn park_time(ts: i64) -> i64 {
 fn schedule_task(job: impl Job, trigger: impl Trigger + 'static) -> Box<Task> {
     let boxed_trigger = Box::new(trigger);
     Box::new(Task {
+        key: *&job.key(),
         job: Arc::new(job),
         priority: boxed_trigger.next_fire_time().ok().unwrap(),
         trigger: boxed_trigger,
@@ -385,6 +442,7 @@ mod test {
         let tick = Duration::new(tick as u64, 0);
         let tick_nanos = *(&tick.as_nanos()) as i64;
         Box::new(Task {
+            key: *&b.key(),
             job: Arc::new(b),
             trigger: Box::new(SimpleTrigger(tick)),
             priority: nownano() + tick_nanos,
@@ -408,7 +466,7 @@ mod test {
 
     #[test]
     fn test_scheduler() {
-	env_logger::init();	
+        env_logger::init();
         let mut sched = Box::new(Scheduler::new());
         sched.start();
 
@@ -431,6 +489,16 @@ mod test {
 
         sched.schedule_task(schedule_task_every(Duration::from_secs(1), job_one));
         sched.schedule_task(schedule_task_every(Duration::from_secs(4), job_two));
+
+        thread::sleep(Duration::from_secs(20));
+
+        assert_eq!(sched.get_scheduled_job(4).unwrap().job.key(), 4);
+        assert_eq!(sched.get_scheduled_job(8).unwrap().job.key(), 8);
+        assert_eq!(sched.get_scheduled_job(16), None);
+        assert_eq!(sched.delete_task(8), true);
+        assert_eq!(sched.delete_task(4), true);
+        assert_eq!(sched.delete_task(16), false);
+
         thread::sleep(Duration::from_secs(40));
     }
 }
