@@ -14,7 +14,7 @@ struct MyTask;
 
 impl quartz_sched::Job for Box<MyTask> {
     fn execute(&self) {
-        println!("executing mytask");
+        println!("[+] Executing 'MyTask'");
     }
     fn description(&self) -> String {
         "my task".to_string()
@@ -33,13 +33,13 @@ fn main() {
 
     // execute after duration N
     sched.schedule_task(quartz_sched::schedule_task_after(
-        Duration::from_secs(4),
+        Duration::from_secs(1),
         Box::new(MyTask),
     ));
 
     // execute every interval N
     sched.schedule_task(quartz_sched::schedule_task_every(
-        Duration::from_secs(8),
+        Duration::from_secs(4),
         Box::new(quartz_sched::SimpleCallbackJob::new(
             Box::new(|_| {
                 println!("[+] From closure");
@@ -49,7 +49,7 @@ fn main() {
         )),
     ));
 
-    thread::sleep(Duration::from_secs(10));
+    thread::sleep(Duration::from_secs(20));
     
     // scheduler will stop after getting dropped
     // alternatively, call sched.stop() to stop 
