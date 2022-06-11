@@ -12,7 +12,7 @@ use std::{thread, time::Duration};
 
 struct MyTask;
 
-impl quartz::Job for Box<MyTask> {
+impl quartz_sched::Job for Box<MyTask> {
     fn execute(&self) {
         println!("executing mytask");
     }
@@ -25,22 +25,22 @@ impl quartz::Job for Box<MyTask> {
 }
 
 fn main() {
-    let mut sched: quartz::Scheduler = quartz::Scheduler::new();
+    let mut sched: quartz_sched::Scheduler = quartz_sched::Scheduler::new();
     
     // start the scheduler
     // spawns execution and feeder threads  
     sched.start();
 
     // execute after duration N
-    sched.schedule_task(quartz::schedule_task_after(
+    sched.schedule_task(quartz_sched::schedule_task_after(
         Duration::from_secs(4),
         Box::new(MyTask),
     ));
 
     // execute every interval N
-    sched.schedule_task(quartz::schedule_task_every(
+    sched.schedule_task(quartz_sched::schedule_task_every(
         Duration::from_secs(8),
-        Box::new(quartz::SimpleCallbackJob::new(
+        Box::new(quartz_sched::SimpleCallbackJob::new(
             Box::new(|_| {
                 println!("[+] From closure");
             }),
