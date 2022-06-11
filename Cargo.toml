@@ -10,6 +10,7 @@ documentation = "https://github.com/mitghi/quartz.rs"
 homepage = "https://github.com/mitghi/quartz.rs"
 description = "Minimalistic scheduling library for Rust"
 keywords = ["job-scheduler", "scheduler", "background-jobs", "crossbeam"]
+categories = ["concurrency", "asynchronous", "algorithms"]
 exclude = [".gitignore"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
