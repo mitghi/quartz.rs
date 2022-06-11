@@ -32,9 +32,9 @@ pub struct Scheduler {
     lock: Arc<Mutex<()>>,
     queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>,
     pool: ThreadPool,
-    pub interrupt: (Sender<bool>, Receiver<bool>),
-    pub exit: (Sender<bool>, Receiver<bool>),
-    pub feeder: (Sender<Box<Task>>, Receiver<Box<Task>>),
+    interrupt: (Sender<bool>, Receiver<bool>),
+    exit: (Sender<bool>, Receiver<bool>),
+    feeder: (Sender<Box<Task>>, Receiver<Box<Task>>),
     started: bool,
 }
 
