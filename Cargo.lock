@@ -274,6 +274,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "crossbeam",
+ "crossbeam-utils 0.8.8",
  "env_logger",
  "log",
  "priority-queue",

@@ -18,6 +18,7 @@ exclude = [".gitignore"]
 [dependencies]
 chrono = "0.4.19"
 priority-queue = "1.2.2"
+crossbeam-utils = "0.8.8"
 crossbeam = "0.8.1"
 threadpool-crossbeam-channel = "1.8.0"
 log = "0.4"
