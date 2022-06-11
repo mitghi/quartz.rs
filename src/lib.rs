@@ -352,6 +352,16 @@ impl Scheduler {
             None => false,
         }
     }
+
+    pub fn get_task_keys(&self) -> Vec<i64> {
+        let _queue = self.queue.lock().unwrap();
+        let mut result = Vec::new();
+        for (task, _) in _queue.iter() {
+            result.push(task.job.key());
+        }
+
+        result
+    }
 }
 
 fn calculate_next_tick(target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>) -> i64 {
@@ -507,6 +517,10 @@ mod test {
 
         sched.schedule_task(schedule_task_every(Duration::from_secs(1), job_one));
         sched.schedule_task(schedule_task_every(Duration::from_secs(4), job_two));
+
+        thread::sleep(Duration::from_secs(1));
+
+        assert_eq!(sched.get_task_keys().iter().sum::<i64>(), 12);
 
         thread::sleep(Duration::from_secs(20));
 
