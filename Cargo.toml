@@ -2,7 +2,15 @@
 name = "quartz"
 version = "0.1.0"
 edition = "2021"
-maintainer = "Milad (Mike) Taghavi <mitghi@gmail.com>"
+authors = ["Milad (Mike) Taghavi <mitghi@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/mitghi/quartz.rs"
+documentation = "https://github.com/mitghi/quartz.rs"
+homepage = "https://github.com/mitghi/quartz.rs"
+description = "Minimalistic scheduling library for Rust"
+keywords = ["job-scheduler", "scheduler", "background-jobs", "crossbeam"]
+exclude = [".gitignore"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
