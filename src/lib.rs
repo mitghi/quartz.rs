@@ -285,6 +285,24 @@ impl Scheduler {
 
         thread::spawn(move || loop {
             if queue.lock().unwrap().len() == 0 {
+		select! {
+		    recv(interrupt_rx) -> msg => {
+			match msg {
+                            Ok(_) => {
+				log::debug!("[*] handling interrupt");
+                            },
+                            Err(_) => {},
+			}
+                    },
+                    recv(exit_rx) -> msg => {
+			match msg {
+                            Ok(_) => {
+				return
+                            },
+                            Err(_) => {},
+			}
+                    }
+		}
             } else {
                 select! {
                     default(Duration::from_nanos(calculate_next_tick(queue.clone()).try_into().unwrap())) => {
