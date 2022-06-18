@@ -452,12 +452,22 @@ fn schedule_task(job: impl Job, trigger: impl Trigger + 'static) -> Box<Task> {
     })
 }
 
+/// schedule_task_every schedules the given `job`
+/// with a trigger that fires after every `tick`.
 pub fn schedule_task_every(tick: Duration, job: impl Job) -> Box<Task> {
     schedule_task(job, SimpleTrigger(tick))
 }
 
+/// schedule_task_after schedules the given `job`
+/// to run once after `tick`.
 pub fn schedule_task_after(tick: Duration, job: impl Job) -> Box<Task> {
     schedule_task(job, SimpleOnceTrigger::new(tick))
+}
+
+/// schedule_task_with schedules the given `job`
+/// with the given `trigger`.
+pub fn schedule_task_with(job: impl Job, trigger: impl Trigger + 'static) -> Box<Task> {
+    schedule_task(job, trigger)
 }
 
 #[cfg(test)]
