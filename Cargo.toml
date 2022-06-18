@@ -1,12 +1,12 @@
 [package]
 name = "quartz_sched"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["Milad (Mike) Taghavi <mitghi@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/mitghi/quartz.rs"
-documentation = "https://github.com/mitghi/quartz.rs"
+documentation = "https://docs.rs/quartz_sched/"
 homepage = "https://github.com/mitghi/quartz.rs"
 description = "Minimalistic scheduling library for Rust"
 keywords = ["job-scheduler", "scheduler", "background-jobs", "crossbeam"]
