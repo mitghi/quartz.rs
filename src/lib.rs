@@ -17,17 +17,21 @@ use std::{
 };
 use threadpool_crossbeam_channel::ThreadPool;
 
+/// Trigger is the trait for implementing triggers.
 pub trait Trigger {
     fn next_fire_time(&self) -> Result<i64, TriggerError>;
     fn description(&self) -> String;
 }
 
+/// Job is the trait that an implementor must conform to
+/// in order to be schedulable and runnable by the scheduler.
 pub trait Job: Send + Sync + 'static {
     fn execute(&self);
     fn description(&self) -> String;
     fn key(&self) -> i64;
 }
 
+/// Scheduler implements the main scheduler.
 pub struct Scheduler {
     lock: Arc<Mutex<()>>,
     queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>,
@@ -38,19 +42,24 @@ pub struct Scheduler {
     started: bool,
 }
 
+/// SimpleTrigger fires after each `Duration`.
 pub struct SimpleTrigger(Duration);
 
+/// SimpleOnceTrigger fires once after specified delay.
 pub struct SimpleOnceTrigger {
     delay: Duration,
     expired: RefCell<bool>,
 }
 
+/// SimpleCallbackJob executes `callback`.
 pub struct SimpleCallbackJob {
     pub callback: Box<dyn Fn(&i64) + Send + Sync + 'static>,
     description: String,
     key_value: i64,
 }
 
+/// Task is a schedulable unit which encapsulates
+/// the `job` and its `trigger`.
 pub struct Task {
     pub job: Arc<dyn Job>,
     pub trigger: Box<dyn Trigger>,
@@ -58,6 +67,8 @@ pub struct Task {
     key: i64,
 }
 
+/// ScheduleJob contains meta data of
+/// the scheduled job.
 pub struct ScheduledJob {
     pub job: Arc<dyn Job>,
     pub trigger_description: String,
@@ -200,6 +211,8 @@ impl Scheduler {
         }
     }
 
+    /// stop stops the execution loop and shuts down all
+    /// channels.
     pub fn stop(&mut self) {
         let _lock = self.lock.lock().unwrap();
 
@@ -217,6 +230,7 @@ impl Scheduler {
         }
     }
 
+    /// start starts the execution loop.
     pub fn start(&mut self) {
         let _lock = self.lock.lock().unwrap();
 
@@ -229,11 +243,13 @@ impl Scheduler {
         self.start_execution_loop();
     }
 
+    /// schedule_task schedules the given `task`.
     pub fn schedule_task(&self, task: Box<Task>) {
         let _lock = self.lock.lock().unwrap();
         _ = self.feeder.0.send(task);
     }
 
+    /// clear drains all tasks.
     pub fn clear(&self) {
         let mut queue = self.queue.lock().unwrap();
         queue.clear();
@@ -329,6 +345,8 @@ impl Scheduler {
         });
     }
 
+    /// get_scheduled_job returns meta data of
+    /// job associated with the given `key`.
     pub fn get_scheduled_job(&self, key: i64) -> Option<ScheduledJob> {
         let _queue = self.queue.lock().unwrap();
 
@@ -345,6 +363,7 @@ impl Scheduler {
         None
     }
 
+    /// delete_task deletes a task from scheduler.
     pub fn delete_task(&self, key: i64) -> bool {
         let mut _queue = self.queue.lock().unwrap();
         match _queue.remove(&key) {
@@ -353,6 +372,7 @@ impl Scheduler {
         }
     }
 
+    /// get_task_keys returns all task keys.
     pub fn get_task_keys(&self) -> Vec<i64> {
         let _queue = self.queue.lock().unwrap();
         let mut result = Vec::new();
@@ -404,7 +424,7 @@ pub fn nownano() -> i64 {
     Utc::now().timestamp_nanos()
 }
 
-pub fn park_time(ts: i64) -> i64 {
+fn park_time(ts: i64) -> i64 {
     let now = nownano();
     if ts > now {
         log::debug!("[*] current and now: {} - {}", &ts, &now);
