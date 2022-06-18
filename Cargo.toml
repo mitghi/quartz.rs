@@ -1,6 +1,6 @@
 [package]
 name = "quartz_sched"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Milad (Mike) Taghavi <mitghi@gmail.com>"]
 license = "MIT"
