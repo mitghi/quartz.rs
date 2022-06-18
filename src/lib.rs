@@ -19,6 +19,9 @@ use threadpool_crossbeam_channel::ThreadPool;
 
 /// Trigger is the trait for implementing triggers.
 pub trait Trigger {
+    /// next_fire_time calculates the next tick in which
+    /// the job should execute. Returning an error
+    /// signals the scheduler to remove the task.
     fn next_fire_time(&self) -> Result<i64, TriggerError>;
     fn description(&self) -> String;
 }
@@ -26,8 +29,13 @@ pub trait Trigger {
 /// Job is the trait that an implementor must conform to
 /// in order to be schedulable and runnable by the scheduler.
 pub trait Job: Send + Sync + 'static {
+    /// execute is the method for executing the task. It gets
+    /// called by the scheduler.
     fn execute(&self);
+    /// description is user-defined description associated with
+    /// the task.
     fn description(&self) -> String;
+    /// key returns unique key associated with the task.
     fn key(&self) -> i64;
 }
 
