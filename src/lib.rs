@@ -17,6 +17,8 @@ use std::{
 };
 use threadpool_crossbeam_channel::ThreadPool;
 
+pub mod cron;
+
 /// Trigger is the trait for implementing triggers.
 pub trait Trigger {
     /// next_fire_time calculates the next tick in which
