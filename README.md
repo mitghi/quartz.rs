@@ -6,13 +6,14 @@ Minimalist scheduling library for Rust
 
 ```rust
 use std::{thread, time::Duration};
+use reqwest;
 
 // MyTask is simple task run by scheduler.
 struct MyTask;
 
-// MyWetter is simple task which requests
+// MyWeather is simple task which requests
 // whether report.
-struct MyWetter;
+struct MyWeather;
 
 // Implement Job trait for `MyTask` to make
 // `MyTask` schedulable.
@@ -28,9 +29,9 @@ impl quartz_sched::Job for Box<MyTask> {
     }
 }
 
-// Implement Job trait for `MyWetter` to make
-// `MyWetter` schedulable.
-impl quartz_sched::Job for Box<MyWetter> {
+// Implement Job trait for `MyWeather` to make
+// `MyWeather` schedulable.
+impl quartz_sched::Job for Box<MyWeather> {
     fn execute(&self) {
         // request whether report for Berlin
         match reqwest::blocking::get("https://wttr.in/berlin?format=3") {
@@ -104,7 +105,7 @@ fn main() {
 
     // execute with custom trigger
     sched.schedule_task(quartz_sched::schedule_task_with(
-        Box::new(MyWetter),
+        Box::new(MyWeather),
         CustomTrigger {
             interval: Duration::from_millis(2000),
             // trigger expires after `ref_count` reaches
