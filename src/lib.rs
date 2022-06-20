@@ -144,7 +144,6 @@ impl Job for Box<SimpleCallbackJob> {
 impl Trigger for SimpleTrigger {
     fn next_fire_time(&self) -> Result<i64, TriggerError> {
         let result = nownano() + self.0.as_nanos() as i64;
-        log::debug!("[*] Next fire time: {}", &result);
         return Ok(result);
     }
 
@@ -275,7 +274,6 @@ impl Scheduler {
                 recv(feeder_rx) -> msg => {
                     match msg {
 			Ok(value) => {
-			    log::debug!("[+] Writing task to queue");
 			    let priority = *&value.priority;
 			    queue.lock().unwrap().push(value, priority);
 			    _ = interrupt_tx.clone().send(true);
@@ -312,9 +310,7 @@ impl Scheduler {
 		select! {
 		    recv(interrupt_rx) -> msg => {
 			match msg {
-                            Ok(_) => {
-				log::debug!("[*] handling interrupt");
-                            },
+                            Ok(_) => {},
                             Err(_) => {},
 			}
                     },
@@ -334,9 +330,7 @@ impl Scheduler {
                     },
                     recv(interrupt_rx) -> msg => {
 			match msg {
-                            Ok(_) => {
-				log::debug!("[*] handling interrupt");
-                            },
+                            Ok(_) => {},
                             Err(_) => {},
 			}
                     },
@@ -397,7 +391,6 @@ fn calculate_next_tick(target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i6
     let _queue = target_queue.lock().unwrap();
     if !_queue.is_empty() {
         interval = park_time(*_queue.peek_min().unwrap().1);
-        log::debug!("[+] Next tick: {}", &interval);
     }
 
     interval
@@ -435,7 +428,6 @@ pub fn nownano() -> i64 {
 fn park_time(ts: i64) -> i64 {
     let now = nownano();
     if ts > now {
-        log::debug!("[*] current and now: {} - {}", &ts, &now);
         return ts - now;
     }
     return 0;
@@ -532,7 +524,6 @@ mod test {
 
     #[test]
     fn test_scheduler() {
-        env_logger::init();
         let mut sched = Box::new(Scheduler::new());
         sched.start();
 
