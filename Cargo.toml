@@ -1,6 +1,6 @@
 [package]
 name = "quartz_sched"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 authors = ["Milad (Mike) Taghavi <mitghi@gmail.com>"]
 license = "MIT"
@@ -16,7 +16,6 @@ exclude = [".gitignore"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.19"
 priority-queue = "1.2.2"
 crossbeam-utils = "0.8.8"
 crossbeam = "0.8.1"
