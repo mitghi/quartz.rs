@@ -14,13 +14,21 @@ const SPECIAL_CRON_TAGS: &[(&'static str, &'static str)] = &[
     ("@yearly", "0 0 0 1 1 *"),
 ];
 
-const E_PARSE_CRON_RANGE_ERROR: &'static str = "Invalid range";
+const E_PARSE_CRON_RANGE: &'static str = "Invalid range";
+const E_PARSE_CRON_UNMATCH_INDEXES: &'static str = "Unable to match indexes";
+const E_PARSE_CRON_INVALID_STEP_RANGE: &'static str = "Invalid step range";
+const E_PARSE_CRON_INVALID_MINMAX_RANGE: &'static str = "Invalid min/max range";
+const E_PARSE_CRON_INVALID_LENGTH: &'static str = "Invalid legnth";
+const E_PARSE_CRON_DAY_FIELD_INVALID: &'static str = "Day field is set twice";
+const E_PARSE_CRON_YEAR_FIELD_INVALID: &'static str = "Year field is not supported, use asterisk";
+const E_PARSE_CRON_LITERAL_INVALID: &'static str = "Cron literal min/max validation error";
+const E_PARSE_CRON_GENERAL: &'static str = "Parse error";
 
 #[derive(Debug, Clone)]
-pub struct TokenError(String);
+pub struct TokenError(&'static str);
 
 #[derive(Debug, Clone)]
-pub struct ParseError(String);
+pub struct ParseError(&'static str);
 
 #[derive(Debug)]
 struct CronField(Vec<i64>);
@@ -70,7 +78,7 @@ fn parse_list_field<'a>(field: &'a str, translate: &'a [&'a str]) -> Result<Cron
             if let Some(index) = translate.iter().position(|&p| *p == *&u_item) {
                 indexes.push(index as i64);
             } else {
-                return Err(ParseError("Unable to match indexes".to_string()));
+                return Err(ParseError(E_PARSE_CRON_UNMATCH_INDEXES));
             }
         }
         converted_items = indexes;
@@ -99,7 +107,7 @@ fn parse_step_field(
     let mut buffer: Vec<i64>;
     let mut items: Vec<&str> = field.split("/").collect();
     if items.len() != 2 {
-        return Err(ParseError("Invalid step range".to_string()));
+        return Err(ParseError(E_PARSE_CRON_INVALID_STEP_RANGE));
     }
     let v: String = min.to_string();
     if items[0] == "*" {
@@ -120,12 +128,12 @@ fn parse_step_field(
         if _value.is_ok() {
             _value.ok().unwrap()
         } else {
-            return Err(ParseError("Invalid step in range".to_string()));
+            return Err(ParseError(E_PARSE_CRON_INVALID_STEP_RANGE));
         }
     };
 
     if !in_range(from, min, max) || max < from {
-        return Err(ParseError("Invalid range".to_string()));
+        return Err(ParseError(E_PARSE_CRON_RANGE));
     };
 
     buffer = Vec::new();
@@ -144,7 +152,7 @@ fn parse_range_field(
 ) -> Result<CronField, ParseError> {
     let items: Vec<&str> = field.split("-").collect();
     if items.len() != 2 {
-        return Err(ParseError("Invalid range".to_string()));
+        return Err(ParseError(E_PARSE_CRON_RANGE));
     }
 
     let from: i64 = {
@@ -166,7 +174,7 @@ fn parse_range_field(
     };
 
     if !in_range(from, min, max) || !in_range(to, min, max) || to < from {
-        return Err(ParseError("Invalid min/max range".to_string()));
+        return Err(ParseError(E_PARSE_CRON_INVALID_MINMAX_RANGE));
     }
 
     Ok(CronField((from..=to).collect()))
@@ -184,7 +192,7 @@ fn validate_cron_expr<'a>(expression: &'a str) -> Result<Vec<&'a str>, TokenErro
 
     match tokens.len() {
         usize::MIN..=5 | 8..=usize::MAX => {
-            return Err(TokenError("Invalid length".to_string()));
+            return Err(TokenError(E_PARSE_CRON_INVALID_LENGTH));
         }
         6 => {
             tokens.push("*");
@@ -193,13 +201,11 @@ fn validate_cron_expr<'a>(expression: &'a str) -> Result<Vec<&'a str>, TokenErro
     };
 
     if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
-        return Err(TokenError("Day field is set twice".to_string()));
+        return Err(TokenError(E_PARSE_CRON_DAY_FIELD_INVALID));
     }
 
     if tokens[6] != "*" {
-        return Err(TokenError(
-            "Year field is not supported, use asterisk".to_string(),
-        ));
+        return Err(TokenError(E_PARSE_CRON_YEAR_FIELD_INVALID));
     }
 
     Ok(tokens)
@@ -309,7 +315,7 @@ fn parse_field(
                 if in_range(*&value, min, max) {
                     return Ok(CronField(vec![value]));
                 } else {
-                    return Err(ParseError("Range Error".to_string()));
+                    return Err(ParseError(E_PARSE_CRON_RANGE));
                 }
             }
             _ => {}
@@ -334,13 +340,11 @@ fn parse_field(
             if in_range(*&index, min, max) {
                 return Ok(CronField(vec![index]));
             }
-            return Err(ParseError(
-                "Cron literal min/max validation error".to_string(),
-            ));
+            return Err(ParseError(E_PARSE_CRON_LITERAL_INVALID));
         }
     }
 
-    Err(ParseError("Cron parse error".to_string()))
+    Err(ParseError(E_PARSE_CRON_GENERAL))
 }
 
 #[cfg(test)]
