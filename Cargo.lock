@@ -184,10 +184,9 @@ dependencies = [
 
 [[package]]
 name = "quartz_sched"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "crossbeam",
- "crossbeam-utils 0.8.8",
  "priority-queue",
  "threadpool-crossbeam-channel",
 ]

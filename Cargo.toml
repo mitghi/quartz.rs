@@ -1,6 +1,6 @@
 [package]
 name = "quartz_sched"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 authors = ["Milad (Mike) Taghavi <mitghi@gmail.com>"]
 license = "MIT"
@@ -17,6 +17,5 @@ exclude = [".gitignore"]
 
 [dependencies]
 priority-queue = "1.2.2"
-crossbeam-utils = "0.8.8"
 crossbeam = "0.8.1"
 threadpool-crossbeam-channel = "1.8.0"
