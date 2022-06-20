@@ -1,6 +1,5 @@
 extern crate priority_queue;
 
-use chrono::prelude::Utc;
 use crossbeam::{
     channel::{bounded, unbounded, Receiver, Sender},
     select,
@@ -422,7 +421,10 @@ fn execute_and_reschedule(
 
 #[inline(always)]
 pub fn nownano() -> i64 {
-    Utc::now().timestamp_nanos()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as i64
 }
 
 fn park_time(ts: i64) -> i64 {
