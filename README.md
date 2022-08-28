@@ -6,20 +6,46 @@ Minimalist scheduling library for Rust
 
 ```rust
 use std::{thread, time::Duration};
+use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use reqwest;
 
 // MyTask is simple task run by scheduler.
-struct MyTask;
+struct MyTask(Arc<AtomicUsize>);
 
 // MyWeather is simple task which requests
 // whether report.
 struct MyWeather;
 
+// CustomTrigger is a simple custom trigger
+// which quits the execution loop after
+// `ref_count` reaches a certain threshold.
+struct CustomTrigger {
+    interval: Duration,
+    ref_count: std::cell::RefCell<i64>,
+}
+
 // Implement Job trait for `MyTask` to make
 // `MyTask` schedulable.
 impl quartz_sched::Job for Box<MyTask> {
-    fn execute(&self) {
+    fn execute(&self, engine: Option<quartz_sched::SchedulerHandle>) {
         println!("[+] Executing 'MyTask'");
+
+	if self.0.clone().fetch_add(1, Ordering::SeqCst) > 10 {
+	    println!("[+] Reached count 10");
+	    // restart the counter
+	    self.0.clone().store(1, Ordering::SeqCst);
+
+	    engine.unwrap().schedule_task(quartz_sched::schedule_task_every(
+		Duration::from_secs(6),
+		Box::new(quartz_sched::SimpleCallbackJob::new(
+		    Box::new(|_| {
+			println!("[+] Scheduled job from another job");
+		    }),
+		    "".to_string(),
+		    256,
+		)),
+	    ));
+	}
     }
     fn description(&self) -> String {
         "my task".to_string()
@@ -32,7 +58,7 @@ impl quartz_sched::Job for Box<MyTask> {
 // Implement Job trait for `MyWeather` to make
 // `MyWeather` schedulable.
 impl quartz_sched::Job for Box<MyWeather> {
-    fn execute(&self) {
+    fn execute(&self, _: Option<quartz_sched::SchedulerHandle>) {
         // request whether report for Berlin
         match reqwest::blocking::get("https://wttr.in/berlin?format=3") {
             Ok(response) => match response.text() {
@@ -50,14 +76,6 @@ impl quartz_sched::Job for Box<MyWeather> {
     fn key(&self) -> i64 {
         128
     }
-}
-
-// CustomTrigger is a simple custom trigger
-// which quits the execution loop after
-// `ref_count` reaches a certain threshold.
-struct CustomTrigger {
-    interval: Duration,
-    ref_count: std::cell::RefCell<i64>,
 }
 
 // Implement `Trigger` for `CustomTrigger`
@@ -85,13 +103,13 @@ fn main() {
     // spawns execution and feeder threads
     sched.start();
 
-    // execute after duration N
-    sched.schedule_task(quartz_sched::schedule_task_after(
+    // execute every interval N
+    sched.schedule_task(quartz_sched::schedule_task_every(
         Duration::from_secs(1),
-        Box::new(MyTask),
+        Box::new(MyTask(Arc::new(AtomicUsize::new(0)))),
     ));
 
-    // execute every interval N
+    // execute after duration N
     sched.schedule_task(quartz_sched::schedule_task_every(
         Duration::from_secs(4),
         Box::new(quartz_sched::SimpleCallbackJob::new(

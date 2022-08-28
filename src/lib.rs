@@ -4,6 +4,7 @@ use crossbeam::{
     channel::{bounded, unbounded, Receiver, Sender},
     select,
 };
+
 use priority_queue::DoublePriorityQueue;
 use std::{
     borrow::Borrow,
@@ -15,6 +16,8 @@ use std::{
     time::Duration,
 };
 use threadpool_crossbeam_channel::ThreadPool;
+
+pub type SchedulerHandle = Arc<dyn Engine>;
 
 /// Trigger is the trait for implementing triggers.
 pub trait Trigger {
@@ -30,7 +33,7 @@ pub trait Trigger {
 pub trait Job: Send + Sync + 'static {
     /// execute is the method for executing the task. It gets
     /// called by the scheduler.
-    fn execute(&self);
+    fn execute(&self, engine: Option<SchedulerHandle>);
     /// description is user-defined description associated with
     /// the task.
     fn description(&self) -> String;
@@ -38,8 +41,17 @@ pub trait Job: Send + Sync + 'static {
     fn key(&self) -> i64;
 }
 
+// Engine is the trait that provides common
+// functionality for Scheduler.
+pub trait Engine: Send + Sync {
+    fn get_scheduled_job(&self, key: i64) -> Option<ScheduledJob>;
+    fn delete_task(&self, key: i64) -> bool;
+    fn schedule_task(&self, task: Box<Task>);
+}
+
+#[derive(Clone)]
 /// Scheduler implements the main scheduler.
-pub struct Scheduler {
+pub struct Scheduler<const THREAD_POOL_SIZE: usize = 8> {
     lock: Arc<Mutex<()>>,
     queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>,
     pool: ThreadPool,
@@ -129,7 +141,7 @@ impl Hash for ScheduledJob {
 }
 
 impl Job for Box<SimpleCallbackJob> {
-    fn execute(&self) {
+    fn execute(&self, _: Option<SchedulerHandle>) {
         (self.callback)(&self.key_value);
     }
     fn description(&self) -> String {
@@ -192,7 +204,7 @@ impl SimpleOnceTrigger {
     }
 }
 
-impl Drop for Scheduler {
+impl<const N: usize> Drop for Scheduler<N> {
     fn drop(&mut self) {
         self.stop();
     }
@@ -204,12 +216,12 @@ impl Borrow<i64> for Box<Task> {
     }
 }
 
-impl Scheduler {
+impl<const N: usize> Scheduler<N> {
     pub fn new() -> Self {
         Self {
             lock: Arc::new(Mutex::new(())),
             queue: Arc::new(Mutex::new(DoublePriorityQueue::new())),
-            pool: ThreadPool::new(8),
+            pool: ThreadPool::new(N),
             interrupt: bounded(1),
             exit: unbounded(),
             feeder: bounded(1),
@@ -297,14 +309,17 @@ impl Scheduler {
     }
 
     #[rustfmt::skip]
-    fn start_execution_loop(&self) {
+    fn start_execution_loop(&'_ self) {
         let exit_rx = self.exit.1.clone();
         let feeder_tx = self.feeder.0.clone();
         let queue = self.queue.clone();
         let interrupt_rx = self.interrupt.1.clone();
         let pool = self.pool.clone();
+        let this: SchedulerHandle = Arc::new(self.clone());
 
-        thread::spawn(move || loop {
+        thread::spawn(move || {
+          let this = this.clone();
+          loop {
             if queue.lock().unwrap().len() == 0 {
 		select! {
 		    recv(interrupt_rx) -> msg => {
@@ -325,7 +340,7 @@ impl Scheduler {
             } else {
                 select! {
                     default(Duration::from_nanos(calculate_next_tick(queue.clone()).try_into().unwrap())) => {
-			execute_and_reschedule(queue.clone(), feeder_tx.clone(), pool.clone());
+			execute_and_reschedule(this.clone(), queue.clone(), feeder_tx.clone(), pool.clone());
                     },
                     recv(interrupt_rx) -> msg => {
 			match msg {
@@ -343,7 +358,7 @@ impl Scheduler {
                     },
                 }
             }
-        });
+       }});
     }
 
     /// get_scheduled_job returns meta data of
@@ -385,6 +400,19 @@ impl Scheduler {
     }
 }
 
+impl<const N: usize> Engine for Scheduler<N> {
+    fn get_scheduled_job(&self, key: i64) -> Option<ScheduledJob> {
+        self.get_scheduled_job(key)
+    }
+    fn delete_task(&self, key: i64) -> bool {
+        self.delete_task(key)
+    }
+    fn schedule_task(&self, task: Box<Task>) {
+        self.schedule_task(task);
+    }
+}
+
+#[inline(always)]
 fn calculate_next_tick(target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>) -> i64 {
     let mut interval: i64 = 0;
     let _queue = target_queue.lock().unwrap();
@@ -396,6 +424,7 @@ fn calculate_next_tick(target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i6
 }
 
 fn execute_and_reschedule(
+    instance: SchedulerHandle,
     target_queue: Arc<Mutex<DoublePriorityQueue<Box<Task>, i64>>>,
     target_chan: Sender<Box<Task>>,
     pool: ThreadPool,
@@ -412,7 +441,7 @@ fn execute_and_reschedule(
     };
     let job_handle = task.job.clone();
     pool.execute(move || {
-        job_handle.execute();
+        job_handle.execute(Some(instance.clone()));
     });
     if task.priority > 0 {
         _ = target_chan.send(task);
@@ -427,6 +456,7 @@ pub fn nownano() -> i64 {
         .as_nanos() as i64
 }
 
+#[inline(always)]
 fn park_time(ts: i64) -> i64 {
     let now = nownano();
     if ts > now {
@@ -476,7 +506,7 @@ mod test {
     #[test]
     fn test_callback() {
         fn run(input: &impl Job) {
-            input.execute();
+            input.execute(None);
         }
 
         let a = Box::new(SimpleCallbackJob::new(
@@ -526,7 +556,7 @@ mod test {
 
     #[test]
     fn test_scheduler() {
-        let mut sched = Box::new(Scheduler::new());
+        let mut sched = Box::new(Scheduler::<8>::new());
         sched.start();
 
         let b = 10;
